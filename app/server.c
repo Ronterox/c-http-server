@@ -66,9 +66,23 @@ int main() {
 		return 1;
 	}
 
-	const char *ok = "HTTP/1.1 200 OK\r\n\r\n";
-	send(client_fd, ok, strlen(ok), 0);
+	char input_buffer[1024];
+	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
+		printf("Read failed: %s \n", strerror(errno));
+		return 1;
+	}
 
+	strtok(input_buffer, " ");
+	char *path = strtok(NULL, " ");
+
+	char *response;
+	if (strcmp(path, "/") == 0) {
+		response = "HTTP/1.1 200 OK\r\n\r\n";
+	} else {
+		response = "HTTP/1.1 404 Not Found\r\n\r\n";
+	}
+
+	send(client_fd, response, strlen(response), 0);
 	close(server_fd);
 
 	return 0;

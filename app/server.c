@@ -87,8 +87,11 @@ void files(struct client_args *client_args, char *path) {
 						ok, file_size, file_contents);
 			send(client_args->client_fd, response, full_length, 0);
 			free(file_contents);
+			free(response);
+			return;
 		}
 	}
+	send(client_args->client_fd, not_found, strlen(not_found), 0);
 }
 
 void *handle_client(void *args) {

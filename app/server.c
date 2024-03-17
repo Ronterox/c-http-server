@@ -88,6 +88,7 @@ void *handle_client(void *args) {
 
 				fclose(file);
 
+				printf("File size: %ld\n", file_size);
 				char response[1024];
 				int full_length = sprintf(response,
 										  "%sContent-Type: text/plain\r\n"

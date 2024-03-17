@@ -88,7 +88,7 @@ int main() {
 			const char *body = strtok(NULL, "/");
 			body = NULL == body ? "" : body;
 
-			char body_length[10];
+			char body_length[32];
 			sprintf(body_length, "%ld", strlen(body));
 
 			char response[1024];

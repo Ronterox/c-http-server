@@ -77,30 +77,37 @@ int main() {
 	strtok(input_buffer, " ");
 	char *path = strtok(NULL, " ");
 
-	const char *ok = "HTTP/1.1 200 OK\r\n";
+	const char ok[] = "HTTP/1.1 200 OK\r\n";
 	if (strcmp(path, "/") == 0) {
 		send(client_fd, ok, strlen(ok), 0);
+	} else if (strncmp(path, "/echo/", 6) == 0) {
+		const char *body = strlen(path) > 6 ? path + 6 : "";
+
+		char response[1024];
+		int full_length = sprintf(response,
+								  "%sContent-Type: text/plain\r\n"
+								  "Content-Length: %ld\r\n\r\n%s",
+								  ok, strlen(body), body);
+
+		send(client_fd, response, full_length, 0);
+	} else if (strcmp(path, "/user-agent") == 0) {
+		char *line;
+		do {
+			line = strtok(NULL, "\r\n");
+			if (strncmp(line, "User-Agent: ", 12) == 0) {
+				char *user_agent = line + 12;
+				char response[1024];
+				int full_length = sprintf(response,
+										  "%sContent-Type: text/plain\r\n"
+										  "Content-Length: %ld\r\n\r\n%s",
+										  ok, strlen(user_agent), user_agent);
+				send(client_fd, response, full_length, 0);
+				break;
+			}
+		} while (line);
 	} else {
-		path = strtok(path, "/");
-		if (strcmp(path, "echo") == 0) {
-			const char *content_type = "Content-Type: text/plain\r\n";
-			const char *content_length = "Content-Length: ";
-			const char *body = strtok(NULL, " ");
-			body = NULL == body ? "" : body;
-
-			char body_length[32];
-			sprintf(body_length, "%ld", strlen(body));
-
-			char response[1024];
-			int full_length =
-				sprintf(response, "%s%s%s%s\r\n\r\n%s", ok, content_type,
-						content_length, body_length, body);
-
-			send(client_fd, response, full_length, 0);
-		} else {
-			const char *not_found = "HTTP/1.1 404 Not Found\r\n";
-			send(client_fd, not_found, strlen(not_found), 0);
-		}
+		const char not_found[] = "HTTP/1.1 404 Not Found\r\n";
+		send(client_fd, not_found, strlen(not_found), 0);
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);

@@ -85,7 +85,7 @@ int main() {
 		if (strcmp(path, "echo") == 0) {
 			const char *content_type = "Content-Type: text/plain\r\n";
 			const char *content_length = "Content-Length: ";
-			const char *body = strtok(NULL, "/");
+			const char *body = strtok(NULL, " ");
 			body = NULL == body ? "" : body;
 
 			char body_length[32];

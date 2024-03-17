@@ -1,22 +1,25 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
-void handle_client(int client_fd) {
+void *handle_client(void *args) {
+	int client_fd = *(int *)args;
 	if (client_fd < 0) {
 		printf("Accept failed: %s \n", strerror(errno));
-		return;
+		return NULL;
 	}
+	printf("Client %d connected\n", client_fd);
 
 	char input_buffer[1024];
 	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
 		printf("Read failed: %s \n", strerror(errno));
-		return;
+		return NULL;
 	}
 
 	printf("Received request: %s\n", input_buffer);
@@ -60,6 +63,7 @@ void handle_client(int client_fd) {
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);
+	return NULL;
 }
 
 int main() {
@@ -108,9 +112,13 @@ int main() {
 	socklen_t client_addr_len = sizeof(client_addr);
 
 	while (1) {
-		const int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
-									 &client_addr_len);
-		handle_client(client_fd);
+		int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
+							   &client_addr_len);
+		pthread_t thread;
+		if (pthread_create(&thread, NULL, &handle_client, &client_fd) != 0) {
+			printf("Thread creation failed: %s \n", strerror(errno));
+			return 1;
+		}
 	}
 	printf("Client connected\n");
 

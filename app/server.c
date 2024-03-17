@@ -248,10 +248,10 @@ int main(int argc, char *argv[]) {
 		pthread_detach(thread);
 	}
 
-	close(server_fd);
 	for (int i = 0; i < file_count; i++) {
 		free(files[i]);
 	}
+	close(server_fd);
 
 	return 0;
 }

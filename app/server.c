@@ -44,6 +44,7 @@ void *handle_client(void *args) {
 	if (strcmp(path, "/") == 0) {
 		const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 0";
 		send(client_fd, response, strlen(response), 0);
+
 	} else if (strncmp(path, "/echo/", 6) == 0) {
 		const char *body = strlen(path) > 6 ? path + 6 : "";
 
@@ -54,6 +55,7 @@ void *handle_client(void *args) {
 								  ok, strlen(body), body);
 
 		send(client_fd, response, full_length, 0);
+
 	} else if (strcmp(path, "/user-agent") == 0) {
 		char *line;
 		do {
@@ -69,6 +71,7 @@ void *handle_client(void *args) {
 				break;
 			}
 		} while (line);
+
 	} else if (strncmp(path, "/files/", 7) == 0) {
 		for (int i = 0; i < client_args->file_count; i++) {
 			char *filename = client_args->files[i];
@@ -100,8 +103,8 @@ void *handle_client(void *args) {
 				free(file_contents);
 			}
 		}
-	} else {
 
+	} else {
 		const char *response = "HTTP/1.1 404 Not Found\r\n"
 							   "Content-Length: 0";
 		send(client_fd, response, strlen(response), 0);

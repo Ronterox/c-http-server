@@ -27,6 +27,7 @@ struct client_args {
 void get_root(int *client_fd) {
 	const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 0";
 	send(*client_fd, response, strlen(response), 0);
+	printf("response: %s\n", response);
 }
 
 void echo(int *client_fd, char *body) {
@@ -114,9 +115,9 @@ void *handle_client(void *args) {
 		send(client_fd, response, strlen(response), 0);
 		return NULL;
 	}
-	printf("Path: %s\n", path);
 
 	if (strcmp(path, "/") == 0) {
+		printf("Root\n");
 		get_root(&client_fd);
 	} else if (strncmp(path, "/echo/", 6) == 0) {
 		char *body = strlen(path) > 6 ? path + 6 : "";

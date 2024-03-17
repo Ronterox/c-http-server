@@ -114,6 +114,7 @@ void *handle_client(void *args) {
 		send(client_fd, response, strlen(response), 0);
 		return NULL;
 	}
+	printf("Path: %s\n", path);
 
 	if (strcmp(path, "/") == 0) {
 		get_root(&client_fd);

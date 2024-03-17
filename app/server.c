@@ -12,12 +12,84 @@
 #include <unistd.h>
 
 #define FILE_LIMIT 100
+#define CONNECTION_BACKLOG 10
+
+const char ok[] = "HTTP/1.1 200 OK\r\n";
+const char not_found[] = "HTTP/1.1 404 Not Found\r\nContent-Length: 0";
 
 struct client_args {
 	int client_fd;
+	char *directory;
 	char (*files)[256];
 	int file_count;
 };
+
+void get_root(int *client_fd) {
+	const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 0";
+	send(*client_fd, response, strlen(response), 0);
+}
+
+void echo(int *client_fd, char *body) {
+	char response[1024];
+	int full_length = sprintf(response,
+							  "%sContent-Type: text/plain\r\n"
+							  "Content-Length: %ld\r\n\r\n%s",
+							  ok, strlen(body), body);
+	send(*client_fd, response, full_length, 0);
+}
+
+void user_agent(int *client_fd) {
+	char *line;
+	do {
+		line = strtok(NULL, "\r\n");
+		if (strncmp(line, "User-Agent: ", 12) == 0) {
+			char *user_agent = line + 12;
+			char response[1024];
+			int full_length = sprintf(response,
+									  "%sContent-Type: text/plain\r\n"
+									  "Content-Length: %ld\r\n\r\n%s",
+									  ok, strlen(user_agent), user_agent);
+			send(*client_fd, response, full_length, 0);
+			break;
+		}
+	} while (line);
+}
+
+void files(struct client_args *client_args, char *path) {
+	for (int i = 0; i < client_args->file_count; i++) {
+		char *filename = client_args->files[i];
+		printf("Filename: %s, Path: %s\n", filename, path + 7);
+		if (strcmp(path + 7, filename) == 0) {
+			char filepath[256];
+			sprintf(filepath, "%s/%s", client_args->directory, filename);
+
+			FILE *file = fopen(filepath, "r");
+			if (!file) {
+				printf("File not found: %s\n", strerror(errno));
+				return;
+			}
+
+			fseek(file, 0, SEEK_END);
+			long file_size = ftell(file);
+
+			char *file_contents = malloc(file_size);
+			fseek(file, 0, SEEK_SET);
+			fread(file_contents, 1, file_size, file);
+
+			fclose(file);
+
+			printf("File size: %ld\n", file_size);
+			char *response = malloc(1024 + file_size);
+			int full_length =
+				sprintf(response,
+						"%sContent-Type: application/octet-stream\r\n"
+						"Content-Length: %ld\r\n\r\n%s",
+						ok, file_size, file_contents);
+			send(client_args->client_fd, response, full_length, 0);
+			free(file_contents);
+		}
+	}
+}
 
 void *handle_client(void *args) {
 	struct client_args *client_args = (struct client_args *)args;
@@ -40,74 +112,17 @@ void *handle_client(void *args) {
 		return NULL;
 	}
 
-	const char ok[] = "HTTP/1.1 200 OK\r\n";
 	if (strcmp(path, "/") == 0) {
-		const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 0";
-		send(client_fd, response, strlen(response), 0);
-
+		get_root(&client_fd);
 	} else if (strncmp(path, "/echo/", 6) == 0) {
-		const char *body = strlen(path) > 6 ? path + 6 : "";
-
-		char response[1024];
-		int full_length = sprintf(response,
-								  "%sContent-Type: text/plain\r\n"
-								  "Content-Length: %ld\r\n\r\n%s",
-								  ok, strlen(body), body);
-
-		send(client_fd, response, full_length, 0);
-
+		char *body = strlen(path) > 6 ? path + 6 : "";
+		echo(&client_fd, body);
 	} else if (strcmp(path, "/user-agent") == 0) {
-		char *line;
-		do {
-			line = strtok(NULL, "\r\n");
-			if (strncmp(line, "User-Agent: ", 12) == 0) {
-				char *user_agent = line + 12;
-				char response[1024];
-				int full_length = sprintf(response,
-										  "%sContent-Type: text/plain\r\n"
-										  "Content-Length: %ld\r\n\r\n%s",
-										  ok, strlen(user_agent), user_agent);
-				send(client_fd, response, full_length, 0);
-				break;
-			}
-		} while (line);
-
+		user_agent(&client_fd);
 	} else if (strncmp(path, "/files/", 7) == 0) {
-		for (int i = 0; i < client_args->file_count; i++) {
-			char *filename = client_args->files[i];
-			printf("Filename: %s, Path: %s\n", filename, path + 7);
-			if (strcmp(path + 7, filename) == 0) {
-				FILE *file = fopen(filename, "r");
-				if (!file) {
-					printf("File not found: %s\n", strerror(errno));
-					return NULL;
-				}
-
-				fseek(file, 0, SEEK_END);
-				long file_size = ftell(file);
-
-				char *file_contents = malloc(file_size);
-				fseek(file, 0, SEEK_SET);
-				fread(file_contents, 1, file_size, file);
-
-				fclose(file);
-
-				printf("File size: %ld\n", file_size);
-				char response[1024];
-				int full_length =
-					sprintf(response,
-							"%sContent-Type: application/octet-stream\r\n"
-							"Content-Length: %ld\r\n\r\n%s",
-							ok, file_size, file_contents);
-				send(client_fd, response, full_length, 0);
-				free(file_contents);
-			}
-		}
-
+		files(client_args, path);
 	} else {
-		const char *response = "HTTP/1.1 404 Not Found\r\n"
-							   "Content-Length: 0";
-		send(client_fd, response, strlen(response), 0);
+		send(client_fd, not_found, strlen(not_found), 0);
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);
@@ -143,9 +158,8 @@ int setup_server(int *server_fd) {
 		return 1;
 	}
 
-	const int connection_backlog = 5;
 	printf("Listening on http://localhost:4221\n");
-	if (listen(*server_fd, connection_backlog) != 0) {
+	if (listen(*server_fd, CONNECTION_BACKLOG) != 0) {
 		printf("Listen failed: %s \n", strerror(errno));
 		return 1;
 	}
@@ -155,7 +169,7 @@ int setup_server(int *server_fd) {
 
 char *set_directory(int *argc, char *argv[]) {
 	int opt;
-	char *directory = ".";
+	char *directory = "./";
 	const static struct option long_options[] = {
 		{"directory", required_argument, 0, 'd'}};
 
@@ -223,7 +237,7 @@ int main(int argc, char *argv[]) {
 		printf("Client %d connected\n", client_fd);
 
 		pthread_t thread;
-		struct client_args args = {client_fd, files, file_count};
+		struct client_args args = {client_fd, directory, files, file_count};
 		if (pthread_create(&thread, NULL, &handle_client, &args) != 0) {
 			printf("Thread creation failed: %s \n", strerror(errno));
 			return 1;

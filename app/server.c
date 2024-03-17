@@ -72,17 +72,38 @@ int main() {
 		return 1;
 	}
 
+	printf("Received request: %s\n", input_buffer);
+
 	strtok(input_buffer, " ");
 	char *path = strtok(NULL, " ");
 
-	char *response;
+	const char *ok = "HTTP/1.1 200 OK\r\n";
 	if (strcmp(path, "/") == 0) {
-		response = "HTTP/1.1 200 OK\r\n\r\n";
+		send(client_fd, ok, strlen(ok), 0);
 	} else {
-		response = "HTTP/1.1 404 Not Found\r\n\r\n";
+		path = strtok(path, "/");
+		if (strcmp(path, "echo") == 0) {
+			const char *content_type = "Content-Type: text/plain\r\n";
+			const char *content_length = "Content-Length: ";
+			const char *body = strtok(NULL, "/");
+			body = NULL == body ? "" : body;
+
+			char body_length[10];
+			sprintf(body_length, "%ld", strlen(body));
+
+			char response[1024];
+			int full_length =
+				sprintf(response, "%s%s%s%s\r\n\r\n%s", ok, content_type,
+						content_length, body_length, body);
+
+			send(client_fd, response, full_length, 0);
+		} else {
+			const char *not_found = "HTTP/1.1 404 Not Found\r\n";
+			send(client_fd, not_found, strlen(not_found), 0);
+		}
 	}
 
-	send(client_fd, response, strlen(response), 0);
+	send(client_fd, "\r\n\r\n", 4, 0);
 	close(server_fd);
 
 	return 0;

@@ -107,6 +107,7 @@ void *handle_client(void *args) {
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);
+	close(client_fd);
 	return NULL;
 }
 
@@ -218,6 +219,7 @@ int main(int argc, char *argv[]) {
 			printf("Thread creation failed: %s \n", strerror(errno));
 			return 1;
 		}
+		pthread_detach(thread);
 	}
 
 	close(server_fd);

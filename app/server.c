@@ -23,12 +23,6 @@ void *handle_client(void *args) {
 	struct client_args *client_args = (struct client_args *)args;
 	int client_fd = client_args->client_fd;
 
-	if (client_fd < 0) {
-		printf("Accept failed: %s \n", strerror(errno));
-		return NULL;
-	}
-	printf("Client %d connected\n", client_fd);
-
 	char input_buffer[1024];
 	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
 		printf("Read failed: %s \n", strerror(errno));
@@ -212,6 +206,12 @@ int main(int argc, char *argv[]) {
 		printf("Waiting for a client to connect...\n");
 		int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
 							   &client_addr_len);
+		if (client_fd < 0) {
+			printf("Accept failed: %s \n", strerror(errno));
+			return 1;
+		}
+		printf("Client %d connected\n", client_fd);
+
 		pthread_t thread;
 		struct client_args args = {client_fd, files, file_count};
 		if (pthread_create(&thread, NULL, &handle_client, &args) != 0) {

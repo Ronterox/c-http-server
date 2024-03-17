@@ -108,7 +108,6 @@ void *handle_client(void *args) {
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);
-	close(client_fd);
 	return NULL;
 }
 

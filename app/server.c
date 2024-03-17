@@ -68,21 +68,24 @@ void *handle_client(void *args) {
 				break;
 			}
 		} while (line);
-	} else {
-		bool found = false;
-		for (int i = 0; i < client_args->file_count && !found; i++) {
-			char filename[256];
-			sprintf(filename, "/%s", client_args->files[i]);
-			printf("Filename: %s, Path: %s\n", filename, path);
-			if (strcmp(path, filename) == 0) {
-				FILE *file = fopen(filename + 1, "r");
-				fseek(file, 0, SEEK_END);
+	} else if (strncmp(path, "/files/", 7) == 0) {
+		for (int i = 0; i < client_args->file_count; i++) {
+			char *filename = client_args->files[i];
+			printf("Filename: %s, Path: %s\n", filename, path + 7);
+			if (strcmp(path + 7, filename) == 0) {
+				FILE *file = fopen(filename, "r");
+				if (!file) {
+					printf("File not found: %s\n", strerror(errno));
+					return NULL;
+				}
 
+				fseek(file, 0, SEEK_END);
 				long file_size = ftell(file);
-				fseek(file, 0, SEEK_SET);
 
 				char *file_contents = malloc(file_size);
+				fseek(file, 0, SEEK_SET);
 				fread(file_contents, 1, file_size, file);
+
 				fclose(file);
 
 				char response[1024];
@@ -92,15 +95,13 @@ void *handle_client(void *args) {
 										  ok, file_size, file_contents);
 				send(client_fd, response, full_length, 0);
 				free(file_contents);
-				found = true;
 			}
 		}
+	} else {
 
-		if (!found) {
-			const char *response = "HTTP/1.1 404 Not Found\r\n"
-								   "Content-Length: 0";
-			send(client_fd, response, strlen(response), 0);
-		}
+		const char *response = "HTTP/1.1 404 Not Found\r\n"
+							   "Content-Length: 0";
+		send(client_fd, response, strlen(response), 0);
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);
@@ -114,8 +115,9 @@ int setup_server(int *server_fd) {
 		return 1;
 	}
 
-	// Since the tester restarts your program quite often, setting REUSE_PORT
-	// ensures that we don't run into 'Address already in use' errors
+	// Since the tester restarts your program quite often, setting
+	// REUSE_PORT ensures that we don't run into 'Address already in use'
+	// errors
 	const int reuse = 1;
 	if (setsockopt(*server_fd, SOL_SOCKET, SO_REUSEPORT, &reuse,
 				   sizeof(reuse)) < 0) {
@@ -168,8 +170,8 @@ int main(int argc, char *argv[]) {
 	// Disable output buffering
 	setbuf(stdout, NULL);
 
-	// You can use print statements as follows for debugging, they'll be visible
-	// when running tests.
+	// You can use print statements as follows for debugging, they'll be
+	// visible when running tests.
 	printf("Logs from your program will appear here!\n");
 
 	char *directory = set_directory(&argc, argv);

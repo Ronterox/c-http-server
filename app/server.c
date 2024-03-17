@@ -32,6 +32,13 @@ void *handle_client(void *args) {
 	printf("Received request:\n%s\n", input_buffer);
 	strtok(input_buffer, " ");
 	char *path = strtok(NULL, " ");
+	if (!path) {
+		const char *response = "HTTP/1.1 400 Bad Request\r\n"
+							   "Content-Length: 0"
+							   "\r\n\r\n";
+		send(client_fd, response, strlen(response), 0);
+		return NULL;
+	}
 
 	const char ok[] = "HTTP/1.1 200 OK\r\n";
 	if (strcmp(path, "/") == 0) {
@@ -101,6 +108,7 @@ void *handle_client(void *args) {
 	}
 
 	send(client_fd, "\r\n\r\n", 4, 0);
+	close(client_fd);
 	return NULL;
 }
 

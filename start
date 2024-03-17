@@ -1,0 +1,3 @@
+#!/bin/bash
+tmux-send-cmd "Test Server" "oha http://localhost:4221"
+nvim .

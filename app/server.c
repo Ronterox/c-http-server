@@ -7,6 +7,61 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+void handle_client(int client_fd) {
+	if (client_fd < 0) {
+		printf("Accept failed: %s \n", strerror(errno));
+		return;
+	}
+
+	char input_buffer[1024];
+	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
+		printf("Read failed: %s \n", strerror(errno));
+		return;
+	}
+
+	printf("Received request: %s\n", input_buffer);
+	strtok(input_buffer, " ");
+	char *path = strtok(NULL, " ");
+
+	const char ok[] = "HTTP/1.1 200 OK\r\n";
+	if (strcmp(path, "/") == 0) {
+		const char *response = "HTTP/1.1 200 OK\r\n"
+							   "Content-Length: 0";
+		send(client_fd, response, strlen(response), 0);
+	} else if (strncmp(path, "/echo/", 6) == 0) {
+		const char *body = strlen(path) > 6 ? path + 6 : "";
+
+		char response[1024];
+		int full_length = sprintf(response,
+								  "%sContent-Type: text/plain\r\n"
+								  "Content-Length: %ld\r\n\r\n%s",
+								  ok, strlen(body), body);
+
+		send(client_fd, response, full_length, 0);
+	} else if (strcmp(path, "/user-agent") == 0) {
+		char *line;
+		do {
+			line = strtok(NULL, "\r\n");
+			if (strncmp(line, "User-Agent: ", 12) == 0) {
+				char *user_agent = line + 12;
+				char response[1024];
+				int full_length = sprintf(response,
+										  "%sContent-Type: text/plain\r\n"
+										  "Content-Length: %ld\r\n\r\n%s",
+										  ok, strlen(user_agent), user_agent);
+				send(client_fd, response, full_length, 0);
+				break;
+			}
+		} while (line);
+	} else {
+		const char *response = "HTTP/1.1 404 Not Found\r\n"
+							   "Content-Length: 0";
+		send(client_fd, response, strlen(response), 0);
+	}
+
+	send(client_fd, "\r\n\r\n", 4, 0);
+}
+
 int main() {
 	// Disable output buffering
 	setbuf(stdout, NULL);
@@ -15,13 +70,7 @@ int main() {
 	// when running tests.
 	printf("Logs from your program will appear here!\n");
 
-	// Uncomment this block to pass the first stage
-
-	int server_fd;
-	socklen_t client_addr_len;
-	struct sockaddr_in client_addr;
-
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == -1) {
 		printf("Socket creation failed: %s...\n", strerror(errno));
 		return 1;
@@ -55,62 +104,16 @@ int main() {
 	}
 
 	printf("Waiting for a client to connect...\n");
-	client_addr_len = sizeof(client_addr);
+	struct sockaddr_in client_addr;
+	socklen_t client_addr_len = sizeof(client_addr);
 
-	const int client_fd =
-		accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+	while (1) {
+		const int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
+									 &client_addr_len);
+		handle_client(client_fd);
+	}
 	printf("Client connected\n");
 
-	if (client_fd < 0) {
-		printf("Accept failed: %s \n", strerror(errno));
-		return 1;
-	}
-
-	char input_buffer[1024];
-	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
-		printf("Read failed: %s \n", strerror(errno));
-		return 1;
-	}
-
-	printf("Received request: %s\n", input_buffer);
-
-	strtok(input_buffer, " ");
-	char *path = strtok(NULL, " ");
-
-	const char ok[] = "HTTP/1.1 200 OK\r\n";
-	if (strcmp(path, "/") == 0) {
-		send(client_fd, ok, strlen(ok), 0);
-	} else if (strncmp(path, "/echo/", 6) == 0) {
-		const char *body = strlen(path) > 6 ? path + 6 : "";
-
-		char response[1024];
-		int full_length = sprintf(response,
-								  "%sContent-Type: text/plain\r\n"
-								  "Content-Length: %ld\r\n\r\n%s",
-								  ok, strlen(body), body);
-
-		send(client_fd, response, full_length, 0);
-	} else if (strcmp(path, "/user-agent") == 0) {
-		char *line;
-		do {
-			line = strtok(NULL, "\r\n");
-			if (strncmp(line, "User-Agent: ", 12) == 0) {
-				char *user_agent = line + 12;
-				char response[1024];
-				int full_length = sprintf(response,
-										  "%sContent-Type: text/plain\r\n"
-										  "Content-Length: %ld\r\n\r\n%s",
-										  ok, strlen(user_agent), user_agent);
-				send(client_fd, response, full_length, 0);
-				break;
-			}
-		} while (line);
-	} else {
-		const char not_found[] = "HTTP/1.1 404 Not Found\r\n";
-		send(client_fd, not_found, strlen(not_found), 0);
-	}
-
-	send(client_fd, "\r\n\r\n", 4, 0);
 	close(server_fd);
 
 	return 0;

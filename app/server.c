@@ -90,10 +90,11 @@ void *handle_client(void *args) {
 
 				printf("File size: %ld\n", file_size);
 				char response[1024];
-				int full_length = sprintf(response,
-										  "%sContent-Type: text/plain\r\n"
-										  "Content-Length: %ld\r\n\r\n%s",
-										  ok, file_size, file_contents);
+				int full_length =
+					sprintf(response,
+							"%sContent-Type: application/octet-stream\r\n"
+							"Content-Length: %ld\r\n\r\n%s",
+							ok, file_size, file_contents);
 				send(client_fd, response, full_length, 0);
 				free(file_contents);
 			}

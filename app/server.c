@@ -13,9 +13,10 @@
 
 #define FILE_LIMIT 100
 #define CONNECTION_BACKLOG 10
+#define END_OF_REQUEST "\r\n\r\n"
 
 const char ok[] = "HTTP/1.1 200 OK\r\n";
-const char not_found[] = "HTTP/1.1 404 Not Found\r\nContent-Length: 0";
+const char not_found[] = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
 
 struct client_args {
 	int client_fd;
@@ -25,16 +26,16 @@ struct client_args {
 };
 
 void get_root(int *client_fd) {
-	const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 0";
+	const char *response = "HTTP/1.1 200 OK\r\n"
+						   "Content-Length: 0" END_OF_REQUEST;
 	send(*client_fd, response, strlen(response), 0);
-	printf("response: %s\n", response);
 }
 
 void echo(int *client_fd, char *body) {
 	char response[1024];
 	int full_length = sprintf(response,
 							  "%sContent-Type: text/plain\r\n"
-							  "Content-Length: %ld\r\n\r\n%s",
+							  "Content-Length: %ld\r\n\r\n%s" END_OF_REQUEST,
 							  ok, strlen(body), body);
 	send(*client_fd, response, full_length, 0);
 }
@@ -46,10 +47,11 @@ void user_agent(int *client_fd) {
 		if (strncmp(line, "User-Agent: ", 12) == 0) {
 			char *user_agent = line + 12;
 			char response[1024];
-			int full_length = sprintf(response,
-									  "%sContent-Type: text/plain\r\n"
-									  "Content-Length: %ld\r\n\r\n%s",
-									  ok, strlen(user_agent), user_agent);
+			int full_length =
+				sprintf(response,
+						"%sContent-Type: text/plain\r\n"
+						"Content-Length: %ld\r\n\r\n%s" END_OF_REQUEST,
+						ok, strlen(user_agent), user_agent);
 			send(*client_fd, response, full_length, 0);
 			break;
 		}
@@ -84,7 +86,7 @@ void files(struct client_args *client_args, char *path) {
 			int full_length =
 				sprintf(response,
 						"%sContent-Type: application/octet-stream\r\n"
-						"Content-Length: %ld\r\n\r\n%s",
+						"Content-Length: %ld\r\n\r\n%s" END_OF_REQUEST,
 						ok, file_size, file_contents);
 			send(client_args->client_fd, response, full_length, 0);
 			free(file_contents);
@@ -110,14 +112,12 @@ void *handle_client(void *args) {
 	char *path = strtok(NULL, " ");
 	if (!path) {
 		const char *response = "HTTP/1.1 400 Bad Request\r\n"
-							   "Content-Length: 0"
-							   "\r\n\r\n";
+							   "Content-Length: 0" END_OF_REQUEST;
 		send(client_fd, response, strlen(response), 0);
 		return NULL;
 	}
 
 	if (strcmp(path, "/") == 0) {
-		printf("Root\n");
 		get_root(&client_fd);
 	} else if (strncmp(path, "/echo/", 6) == 0) {
 		char *body = strlen(path) > 6 ? path + 6 : "";
@@ -129,8 +129,6 @@ void *handle_client(void *args) {
 	} else {
 		send(client_fd, not_found, strlen(not_found), 0);
 	}
-
-	send(client_fd, "\r\n\r\n", 4, 0);
 	return NULL;
 }
 

@@ -79,8 +79,6 @@ void files(struct client_args *client_args, char *path) {
 			fseek(file, 0, SEEK_SET);
 			fread(file_contents, 1, file_size, file);
 
-			fclose(file);
-
 			printf("File size: %ld\n", file_size);
 			char *response = malloc(1024 + file_size);
 			int full_length =
@@ -91,6 +89,7 @@ void files(struct client_args *client_args, char *path) {
 			send(client_args->client_fd, response, full_length, 0);
 			free(file_contents);
 			free(response);
+			fclose(file);
 			return;
 		}
 	}
@@ -104,6 +103,7 @@ void *handle_client(void *args) {
 	char input_buffer[1024];
 	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
 		printf("Read failed: %s \n", strerror(errno));
+		close(client_fd);
 		return NULL;
 	}
 
@@ -114,6 +114,7 @@ void *handle_client(void *args) {
 		const char *response = "HTTP/1.1 400 Bad Request\r\n"
 							   "Content-Length: 0" END_OF_REQUEST;
 		send(client_fd, response, strlen(response), 0);
+		close(client_fd);
 		return NULL;
 	}
 
@@ -129,6 +130,7 @@ void *handle_client(void *args) {
 	} else {
 		send(client_fd, not_found, strlen(not_found), 0);
 	}
+	close(client_fd);
 	return NULL;
 }
 
@@ -241,7 +243,7 @@ int main(int argc, char *argv[]) {
 
 		pthread_t thread;
 		struct client_args args = {client_fd, directory, files, file_count};
-		if (pthread_create(&thread, NULL, &handle_client, &args) != 0) {
+		if (pthread_create(&thread, NULL, handle_client, &args) != 0) {
 			printf("Thread creation failed: %s \n", strerror(errno));
 			return 1;
 		}

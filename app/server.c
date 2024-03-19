@@ -190,7 +190,7 @@ int setup_server(int *server_fd) {
 }
 
 char *set_directory(int *argc, char *argv[]) {
-	int opt;
+	int opt, last;
 	char *directory = ".";
 	const static struct option long_options[] = {
 		{"directory", required_argument, 0, 'd'}};
@@ -198,7 +198,7 @@ char *set_directory(int *argc, char *argv[]) {
 	while ((opt = getopt_long(*argc, argv, "d:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
-			int last = strlen(optarg) - 1;
+			last = strlen(optarg) - 1;
 			if (optarg[last] == '/') {
 				optarg[last] = '\0';
 			}

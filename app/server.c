@@ -58,7 +58,7 @@ void user_agent(int *client_fd) {
 	} while (line);
 }
 
-void files(struct client_args *client_args, char *path) {
+void get_file(struct client_args *client_args, char *path) {
 	for (int i = 0; i < client_args->file_count; i++) {
 		char *filename = client_args->files[i];
 		printf("Filename: %s, Path: %s\n", filename, path + 7);
@@ -96,19 +96,33 @@ void files(struct client_args *client_args, char *path) {
 	send(client_args->client_fd, not_found, strlen(not_found), 0);
 }
 
+void set_file(struct client_args *client_args, char *body, char *path) {
+	char filepath[256];
+	sprintf(filepath, "%s/%s", client_args->directory, path + 7);
+
+	FILE *file = fopen(filepath, "w");
+	body = strtok(body, "\r\n");
+	fprintf(file, "%s", body);
+
+	char *response = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+	send(client_args->client_fd, response, strlen(response), 0);
+	fclose(file);
+}
+
 void *handle_client(void *args) {
 	struct client_args *client_args = (struct client_args *)args;
 	int client_fd = client_args->client_fd;
 
-	char input_buffer[1024];
-	if (read(client_fd, input_buffer, sizeof(input_buffer)) < 0) {
+	char request[1024];
+	if (read(client_fd, request, sizeof(request)) < 0) {
 		printf("Read failed: %s \n", strerror(errno));
 		close(client_fd);
 		return NULL;
 	}
 
-	printf("Received request:\n%s\n", input_buffer);
-	strtok(input_buffer, " ");
+	printf("Received request:\n%s\n", request);
+	char *body = strstr(request, "\r\n\r\n");
+	char *method = strtok(request, " ");
 	char *path = strtok(NULL, " ");
 	if (!path) {
 		const char *response = "HTTP/1.1 400 Bad Request\r\n"
@@ -126,7 +140,10 @@ void *handle_client(void *args) {
 	} else if (strcmp(path, "/user-agent") == 0) {
 		user_agent(&client_fd);
 	} else if (strncmp(path, "/files/", 7) == 0) {
-		files(client_args, path);
+		if (strcmp(method, "GET") == 0)
+			get_file(client_args, path);
+		else if (strcmp(method, "POST") == 0)
+			set_file(client_args, body, path);
 	} else {
 		send(client_fd, not_found, strlen(not_found), 0);
 	}
@@ -174,13 +191,17 @@ int setup_server(int *server_fd) {
 
 char *set_directory(int *argc, char *argv[]) {
 	int opt;
-	char *directory = "./";
+	char *directory = ".";
 	const static struct option long_options[] = {
 		{"directory", required_argument, 0, 'd'}};
 
 	while ((opt = getopt_long(*argc, argv, "d:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
+			int last = strlen(optarg) - 1;
+			if (optarg[last] == '/') {
+				optarg[last] = '\0';
+			}
 			directory = optarg;
 			break;
 		default:
@@ -188,6 +209,7 @@ char *set_directory(int *argc, char *argv[]) {
 			return NULL;
 		}
 	}
+
 	return directory;
 }
 
